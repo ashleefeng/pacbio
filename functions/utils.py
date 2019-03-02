@@ -37,7 +37,7 @@ def plot_one_trace(data, traceID, time_axis, foi, colors):
     plt.ylabel('Intensity')
     plt.title('Trace ' + str(traceID))
 
-def plot_one_trace_bgs(data, traceID, time_axis, background, foi, colors):
+def plot_one_trace_bgs(data, traceID, time_axis, background, foi, colors, n_frames):
 #     plt.figure(figsize=(15, 2))
     trc = data[traceID, :, foi]
     corrected = np.zeros((4, n_frames))
