@@ -3,6 +3,8 @@ from subprocess import check_output
 from PyQt5.QtWidgets import QFileDialog, QApplication
 import matplotlib.pyplot as plt
 import numpy as np
+import xml.etree.ElementTree as ET
+import h5py
 
 """
 Utility functions for analyzing pacbio data
@@ -18,6 +20,51 @@ def gui_fname(directory='E:/Ashlee/PacBio/'):
     # run this exact file in a separate process, and grab the result
     file = check_output([executable, __file__, directory])
     return file.strip()
+
+def load_data(sample_prefix):
+    """
+    Load pacbio dataset
+
+    input: string, prefix for pacbio files 
+    eg. ~/data/m181207_211324_42131_c000468682559900001500000112312060_s1_p0
+    
+    output: np.array((n_traces, 4, n_frames)), raw_traces
+    """
+
+    trc_filename = sample_prefix + '.trc.h5'
+    mcd_filename = sample_prefix + '.mcd.h5'
+    upd_filename = sample_prefix + '.upd.h5'
+    meta_filename = sample_prefix + '.metadata.xml'
+
+    trc_file = h5py.File(trc_filename, 'r')
+    # mcd_file = h5py.File(mcd_filename, 'r')
+    # upd_file = h5py.File(upd_filename, 'r')
+
+    # Load data in trace file
+    dset = trc_file['TraceData']
+    raw_traces = dset['Traces']
+    n_frames = raw_traces.shape[2]
+    decode = dset['Codec']['Decode']
+    decode_array = np.array(decode)
+
+    # # Load data in upd file
+    # upd_TD = upd_file['TraceData']
+    # hole_xy_plot = upd_TD['HoleXYPlot'] # (x,y) coordinates for each well
+    # hole_status = upd_TD['HoleStatus'] # fiducials
+
+    # Extract frame rate from metadata
+    meta_tree = ET.parse(meta_filename)
+    root = meta_tree.getroot()
+    for keyval in root.iter('{http://pacificbiosciences.com/PAP/Metadata.xsd}KeyValue'):
+        if keyval.attrib['key'] == 'MovieFPS':
+            fps = int(keyval.text)
+            frame_rate = 1.0/fps # seconds
+            break
+
+    # For plotting
+    time_axis = np.arange(n_frames)*frame_rate
+    
+    return raw_traces, decode_array, time_axis
 
 
 def plot_one_trace(data, traceID, time_axis, foi, colors):
