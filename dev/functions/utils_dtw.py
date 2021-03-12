@@ -7,24 +7,28 @@ from time import time
 data = []
 init_class = []
 traces = []
+frames2avg = 1
 
 def smoothen_cy5_single(traceID):
 
     trc = traces[traceID, 2, :]
     n_frames = traces.shape[2]
-    trc_stack = np.zeros((3, n_frames-2))
-    trc_stack[0] = trc[0:-2]
-    trc_stack[1] = trc[1:-1]
-    trc_stack[2] = trc[2:]
+    n_frames_new  = n_frames - frames2avg + 1
+    trc_stack = np.zeros((frames2avg, n_frames_new))
+
+    for i in range(frames2avg):
+        trc_stack[i] = trc[i: (i + n_frames_new)]
+
     smoothened = np.mean(trc_stack, axis=0)
     return smoothened
 
-def smoothen_cy5(data):
+def smoothen_cy5(data, f2a):
 
     """
-    Average every 3 frames of Cy5 emission
+    Average every n frames of Cy5 emission
 
-    input: np.array((n_traces, 4, n_frames))
+    input: data - np.array((n_traces, 4, n_frames))
+           f2a - int, number of frames to average
 
     output: np.array((n_traces)
 
@@ -33,12 +37,15 @@ def smoothen_cy5(data):
     global traces 
     traces = data
 
+    global frames2avg
+    frames2avg = f2a
+
     start = time()
 
     n_traces = traces.shape[0]
     n_frames = traces.shape[2]
 
-    smoothened = np.zeros((n_traces, n_frames-2))
+    smoothened = np.zeros((n_traces, n_frames-(f2a-1)))
     pool = mp.Pool(mp.cpu_count())
     smoothened = np.array(pool.map(smoothen_cy5_single, iter(range(n_traces))))
 
@@ -64,7 +71,7 @@ def normalize(traces):
     # zero-center the traces
     centered_cy5 = np.zeros((n_traces, n_frames))
     for i in range(n_traces):
-        centered_cy5[i] = traces[i, :] - avg_intens[i]
+        centered_cy5[i, :] = traces[i, :] - avg_intens[i]
 
     scaled_data_cy5 = np.zeros((n_traces, n_frames))
 
@@ -81,25 +88,26 @@ def normalize(traces):
 
     return scaled_data_cy5
 
-def plot_traces(n, data, indices, time_axis):
-    plt.figure(figsize=(15, n*1.2))
+def plot_traces(data, indices, time_axis):
+    n = len(indices)
+    plt.figure(figsize=(15, n*2))
     if n % 2 == 1:
         n = n-1
     for i in range(n):
-        plt.subplot(int(n/2), 2, i+1)
+        plt.subplot(n, 1, i+1)
         trc = data[indices[i]]
         if len(data.shape) == 2:
-            plt.plot(time_axis, trc)
+            plt.plot(time_axis, trc, linewidth=0.5)
         else:
             for j in range(data.shape[1]):
                 plt.plot(time_axis, trc[j], color=colors[j])
 
         plt.xlabel('Time (s)')
         plt.ylabel('Intensity')
-        plt.title('Trace ' + str(i))
+        plt.title('Trace ' + str(i) + ' (ID. ' + str(indices[i]) + ')')
         
         i = i + 1
-    plt.subplots_adjust(hspace=0.7)
+    plt.subplots_adjust(hspace=1)
 
 def dtw(a1, a2):
     return fastdtw(a1.T, a2.T)[0]
